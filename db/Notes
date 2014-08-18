@@ -1,0 +1,49 @@
+Notes
+
+Classes
+
+Cashier
+-id
+-name
+login
+
+Product
+-id
+-name
+-price
+
+Customer
+-id
+-name
+
+Transaction
+-id
+-date
+-type (return or purchase)
+-item_id
+-customer_id
+-cashier_id
+
+Item
+-id
+-transaction_id
+-product_id
+-quantity
+-unit
+
+
+Menu
+Customer
+-view receipt
+
+Cashier
+-create purchase
+-return a purchase
+
+Manager
+-add edit delete product
+-add edit delete cashier
+-view popular products
+-view most returned products
+-view total sales by date range
+-view customers by cashier by date range
