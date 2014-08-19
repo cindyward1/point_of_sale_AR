@@ -46,4 +46,4 @@ Manager
 -view popular products
 -view most returned products
 -view total sales by date range
--view customers by cashier by date range
+-view customer count by cashier by date range
