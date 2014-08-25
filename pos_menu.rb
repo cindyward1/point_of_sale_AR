@@ -371,7 +371,7 @@ end
 def show_receipt(the_receipt, the_customer)
   puts "\nThe receipt for #{the_customer.name}'S #{the_receipt.type_deal} on #{the_receipt.date}\n"
   total = show_items(the_receipt)
-  puts "\nTotal of #{the_receipt.type_deal} was $#{receipt.total}\n"
+  puts "\nTotal of #{the_receipt.type_deal} was $#{the_receipt.total}\n"
   total
 end
 
