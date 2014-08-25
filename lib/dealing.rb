@@ -1,4 +1,4 @@
-class Transaction < ActiveRecord::Base
+class Dealing < ActiveRecord::Base
   belongs_to :customer
   belongs_to :cashier
   has_many :items

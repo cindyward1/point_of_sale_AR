@@ -3,7 +3,7 @@ require "./lib/cashier.rb"
 require "./lib/customer.rb"
 require "./lib/item.rb"
 require "./lib/product.rb"
-require "./lib/transaction.rb"
+require "./lib/dealing.rb"
 
 database_configurations = YAML::load(File.open('./db/config.yml'))
 development_configuration = database_configurations['development']
@@ -12,41 +12,46 @@ ActiveRecord::Base.establish_connection(development_configuration)
 def main_menu
   puts "\n"
   puts "*" * 35
-  puts "Welcome to the Point of Sale System"
+  puts "Welcome to the C & P Store's Point of Sale System"
   puts "*" * 35
-  puts "\nType 'c' for customer, 'ca' for cashier or 'm' for manager"
-  role=gets.chomp
+  puts "\nMAIN MENU"
+  puts "[ g ] = Manager menu"
+  puts "[ s ] = Cashier menu"
+  puts "[ c ] = Customer menu"
+  puts "[ m ] = Main menu (this menu)"
+  puts "[ x ] = Exit program"
+  role=gets.chomp.downcase
   case role
   when 'c'
     customer_menu
-  when 'ca'
+  when 's'
     cashier_menu
-  when 'm'
+  when 'g'
     manager_menu
+  when 'm'
+  when 'x'
+    exit_program
   else
-    puts" Please choose a valid option"
+    puts"\nPlease choose a valid option"
   end
 end
 
 def customer_menu
   choice = nil
   while choice != 'x' && choice != 'm' do
-    puts "To view your receipt, please enter your name."
+    puts "\nVIEW RECEIPT"
+    puts "To view a receipt, please enter your name."
     name=gets.chomp.downcase
-    list_receipts
-    puts "Please choose a date to view the receipt details (format 'MM/DD/YYYY')."
-    date=gets.chomp
-    if date =~ /\d\d\/\d\d\/\d\d\d\d/
-      find_receipt
-      puts "Type 'x' to exit, 'm' to go to the main menu, or any other character to continue"
-      choice = gets.chomp.downcase
-      if choice == 'x'
-        exit
-      elsif choice == 'm'
-        main_menu
+    receipt_array = list_dealings
+    if !receipt_array.empty?
+      puts "\nPlease select the index of the receipt"
+      puts "Enter 'm' to go to the main menu or 'x' to exit the program"
+      receipt_index_str = gets.chomp
+      if receipt_index_str != 'x' && receipt_index_str != 'm'
+        receipt_index = receipt_index_str.to_i
+        the_receipt = receipt_array[index-1]
+        show_receipt(the_receipt)
       end
-    else
-      puts "Date must be in 'MM/DD/YYYY' format; please try again"
     end
   end
 end
@@ -54,36 +59,41 @@ end
 def list_receipts
 end
 
-def find_receipt
+def show
 end
 
 def manager_menu
   choice = nil
   while choice != 'x' && choice != 'm' do
-    puts "\nType 'c'   to create a cashier"
-    puts "Type 'p'   to create a product"
-    puts "Type 'fp'  to view favorite products"
-    puts "Type 'rp'  to view most returned products"
-    puts "Type 'ts'  to view total sales by date range"
-    puts "Type 'cc'  to view customer count by cashier by date range"
-    choice=gets.chomp.downcase
+    puts "\nMANAGER MENU"
+    puts "[ c ] = Create a cashier"
+    puts "[ p ] = Create a product"
+    puts "[ f ] = View favorite products"
+    puts "[ r ] = View most returned products"
+    puts "[ s ] = View sales for a date range"
+    puts "[ n ] = View customer count by cashier for a date range\n"
+    puts "[ b ] = (back to) Manager menu"
+    puts "[ m ] = Main menu"
+    puts "[ x ] = Exit program"
+    choice = gets.chomp.downcase
     case choice
-    when'c'
+    when 'c'
       create_cashier
     when 'p'
       create_product
-    when 'fp'
+    when 'f'
       view_favorite_products
-    when 'rp'
+    when 'r'
       view_most_returned_products
-    when 'ts'
+    when 's'
       view_total_sales
-    when 'cc'
+    when 'n'
       view_customer_count
-    when 'mm'
+    when 'm'
       main_menu
+    when 'b'
     when 'x'
-      exit
+      exit_program
     else
       puts "Please choose a valid option"
     end
@@ -92,42 +102,65 @@ end
 
 def create_cashier
   choice = nil
-  while choice != "x" && choice != "m"
+  while choice != "x" && choice != "m" && choice != 'b'
     puts "\nPlease enter the name of the cashier"
     name = gets.chomp
-    puts "Please enter the login name of the cashier"
+    puts "\nPlease enter the login name of the cashier"
     login = gets.chomp.downcase
     new_cashier = Cashier.create({:name=>name, :login=>login})
     puts "\nCashier #{new_cashier.name} with login: #{new_cashier.login} was added to the database."
-    puts "Would you like to enter another cashier?"
-    puts "Type 'x' to exit, 'm' to go to the main menu, or any other character to continue"
+    puts "\nEnter 'm' to go to the main menu,'x' to exit the program"
+    puts "Enter any other character to continue adding cashiers"
     choice = gets.chomp.downcase
-    if choice == "x"
-      exit
-    elsif choice == "m"
+    case choice
+    when 'x'
+      exit_program
+    when 'm'
       main_menu
+    when 'b'
+    else
+      puts "\nInvalid option, try again"
     end
   end
 end
 
 def create_product
   choice = nil
+  unit_array - ["ea","lb","oz","yd","in","q","ts","kg","g","m","cm","l","ml"]
   while choice != "x" && choice != "m"
-    puts "Please enter the name of the product"
+    puts "\nEnter the name of the product"
     name = nil
     name = gets.chomp.upcase
     if name != nil
-      puts "Please enter the price of the product"
+      puts "Enter the price of the product"
       price = gets.chomp.to_f.round(2)
       if price > 0
-        puts "Please enter the unit for the price (e.g. ea, lb, kg, yd, in, cm)"
-        unit = nil
+        puts "Select the unit by which the product will be sold"
+        puts "[ ea ] = each (default)"
+        puts "British units"
+        puts "[ lb ] = pound"
+        puts "[ oz ] = ounce"
+        puts "[ yd ] = yard"
+        puts "[ in ] = inch"
+        puts "[ q  ] = quart"
+        puts "[ ts ] = teaspoon"
+        puts "Metric units"
+        puts "[ kg ] = kilogram"
+        puts "[ g  ] = gram"
+        puts "[ me ] = meter"
+        puts "[ cm ] = centimeter"
+        puts "[ l  ] = liter"
+        puts "[ ml ] = milliliter"
+        puts "Menu options"
+        puts "[ m ] = Main menu"
+        puts "[ x ] = Exit program"
         unit = gets.chomp.downcase
-        if !unit
-          unit = "ea"
+        if unit_array.include?(unit)
+          new_product = Product.create({:name=>name, :price=>price, :unit=>unit})
+          puts "Product #{new_product.name} with price : #{new_product.price}/#{new_product.unit} was saved to the database"
+        else
+          puts "Unit entered not found, try again"
         end
-        new_product = Product.create({:name=>name, :price=>price, :unit=>unit})
-        puts "Product #{new_product.name} with price : #{new_product.price}/#{new_product.unit} was saved to the database"
       else
         puts "Price must be greater than zero"
       end
@@ -135,12 +168,10 @@ def create_product
       puts "A product name must be entered"
     end
     puts "Would you like to enter another product?"
-    puts "Type 'x' to exit, 'm' to go to the main menu, or any other character to continue"
+    puts "Enter 'x' to exit, 'm' to go to the main menu, or any other character to continue"
     choice = gets.chomp.downcase
     if choice == "x"
-      exit
-    elsif choice == "m"
-      main_menu
+      exit_program
     end
   end
 end
@@ -158,20 +189,21 @@ def view_customer_count
 end
 
 def cashier_menu
-  puts "\nPlease log in to the system"
+  puts "\nCASHIER LOGIN"
   status = false
   status = cashier_log_in
   if !status
-    puts "\nYou are not in the system as an authorized user"
-    puts "Please have your manager set up a login for you"
+    puts "\nYou are not in the system as an authorized cashier"
+    puts "Please contact your manager"
     exit
   end
   choice = nil
   while choice != "m" && choice != "x"
-    puts "\nType 'p'      to create a purchase"
-    puts "Type 'r'      to process a return"
-    puts "Type 'x'      to exit the program"
-    puts "Type 'm'      to return to the main menu"
+    puts "\nCASHIER MENU"
+    puts "[ p ] = Create a purchase"
+    puts "[ r ] = Process a return"
+    puts "[ m ] = Main menu"
+    puts "[ x ] = Exit program"
     choice = gets.chomp
     case choice
     when 'p'
@@ -179,9 +211,8 @@ def cashier_menu
     when 'r'
       process_return
     when 'x'
-      exit
+      exit program
     when 'm'
-      main_menu
     else
       puts "Please choose a valid option"
     end
@@ -189,12 +220,11 @@ def cashier_menu
 end
 
 def cashier_log_in
-  puts "Please enter your login"
+  puts "Please log in to the system by entering your cashier ID"
   login = gets.chomp.downcase
-  new_cashier = nil
-  new_cashier = Cashier.find_by(login: login)
-  if new_cashier
-    @current_cashier = new_cashier
+  cashier_array = Cashier.find_by(login: login)
+  if !cashier_array.empty?
+    @current_cashier = login
     return true
   else
     return false
@@ -202,7 +232,7 @@ def cashier_log_in
 end
 
 def create_purchase
-  type_trans='purchase'
+  type_deal='purchase'
   puts "Please enter the customer name"
   name = gets.chomp.upcase
   found_customer = nil
@@ -222,16 +252,25 @@ def create_purchase
       puts "Please enter the quantity"
       quantity= gets.chomp.to_i
       if quantity > 0
-        new_transaction = Transaction.create({:date=>date, :type_trans=>type_trans,
+        new_dealing = Dealing.create({:date=>date, :type_deal=>type_deal,
                                 :customer_id=>found_customer.id, :cashier_id=>@current_cashier.id})
-        new_item = Item.create({:quantity=>quantity, :transaction_id=>new_transaction.id,
+        new_item = Item.create({:quantity=>quantity, :dealing_id=>new_dealing.id,
                                 :product_id=>new_product.id})
-        puts "Would you like to add more items?"
+        puts "Enter 'y' or 'yes' to continue adding items"
+        puts "Enter 'm' to go to the main menu,'x' to exit the program"
+        puts "Enter any other character to complete the transaction and print the receipt"
         choice = gets.chomp.downcase.slice(0,1)
-        if choice == "y"
-          add_items(new_transaction.id)
+        case choice
+        when 'y'
+          add_items(new_dealing.id,"y")
+          show_receipt(new_dealing.id)
+        when 'm'
+          main_menu
+        when 'x'
+          exit_program
+        else
+          show_receipt(new_dealing.id)
         end
-        print_receipt
       else
         puts "Product quantity must be greater than zero"
       end
@@ -243,9 +282,8 @@ def create_purchase
   end
 end
 
-def add_items(transaction_id)
-  choice = nil
-  while choice != 'x' && choice != 'n'
+def add_items(dealing_id, choice)
+  while choice == "y"
     puts "Please enter the next product"
     product = gets.chomp.upcase
     new_product = nil
@@ -255,7 +293,7 @@ def add_items(transaction_id)
       puts "Please enter the quantity"
       quantity= gets.chomp.to_i
       if quantity > 0
-        new_item = Item.create({:quantity=>quantity, :transaction_id=>transaction_id,
+        new_item = Item.create({:quantity=>quantity, :dealing_id=>dealing_id,
                                 :product_id=>new_product.id})
       else
         puts "Product quantity must be greater than zero"
@@ -263,11 +301,15 @@ def add_items(transaction_id)
     else
       puts "Product not found in the database"
     end
-    puts "Would you like to add more items?"
-    puts "Enter 'n' to stop adding items and complete purchase, 'x' to exit the program"
+    puts "Enter 'y' or 'yes' to continue adding items"
+    puts "Enter 'm' to go to the main menu,'x' to exit the program"
+    puts "Enter any other character to complete the transaction and print the receipt"
     choice = gets.chomp.downcase.slice(0,1)
-    if choice == "x"
-      exit
+    case choice
+    when 'm'
+      main_menu
+    when 'x'
+      exit_program
     end
   end
 end
@@ -279,6 +321,12 @@ def show_total
 end
 
 def process_return
+end
+
+def exit_program
+  puts "\n\nThanks for using the C & P Store's Point of Sale program!"
+  puts "Please visit again soon!\n\n"
+  exit
 end
 
 main_menu
