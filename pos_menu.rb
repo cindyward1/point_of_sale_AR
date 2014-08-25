@@ -9,30 +9,38 @@ database_configurations = YAML::load(File.open('./db/config.yml'))
 development_configuration = database_configurations['development']
 ActiveRecord::Base.establish_connection(development_configuration)
 
-def main_menu
+def welcome
   puts "\n"
   puts "*" * 35
   puts "Welcome to the C & P Store's Point of Sale System"
   puts "*" * 35
-  puts "\nMAIN MENU"
-  puts "[ g ] = Manager menu"
-  puts "[ s ] = Cashier menu"
-  puts "[ c ] = Customer menu"
-  puts "[ m ] = Main menu (this menu)"
-  puts "[ x ] = Exit program"
-  role=gets.chomp.downcase
-  case role
-  when 'c'
-    customer_menu
-  when 's'
-    cashier_menu
-  when 'g'
-    manager_menu
-  when 'm'
-  when 'x'
-    exit_program
-  else
-    puts"\nPlease choose a valid option"
+  puts "\n"
+  main_menu
+end
+
+def main_menu
+  role = nil
+  while role != 'x'
+    puts "\nMAIN MENU"
+    puts "[ g ] = Manager menu"
+    puts "[ s ] = Cashier menu"
+    puts "[ c ] = Customer menu"
+    puts "[ m ] = Main menu (this menu)"
+    puts "[ x ] = Exit program"
+    role=gets.chomp.downcase
+    case role
+    when 'c'
+      customer_menu
+    when 's'
+      cashier_menu
+    when 'g'
+      manager_menu
+    when 'm'
+    when 'x'
+      exit_program
+    else
+      puts"\nPlease choose a valid option"
+    end
   end
 end
 
@@ -40,26 +48,72 @@ def customer_menu
   choice = nil
   while choice != 'x' && choice != 'm' do
     puts "\nVIEW RECEIPT"
-    puts "To view a receipt, please enter your name."
-    name=gets.chomp.downcase
-    receipt_array = list_dealings
-    if !receipt_array.empty?
-      puts "\nPlease select the index of the receipt"
-      puts "Enter 'm' to go to the main menu or 'x' to exit the program"
-      receipt_index_str = gets.chomp
-      if receipt_index_str != 'x' && receipt_index_str != 'm'
-        receipt_index = receipt_index_str.to_i
-        the_receipt = receipt_array[index-1]
-        show_receipt(the_receipt)
+    puts "To view a receipt, please enter your name"
+    puts "Enter 'm' to go to the main menu or 'x' to exit the program"
+    customer_name = gets.chomp.upcase
+    if customer_name != "X" && customer_name != "M"
+      receipt_array = list_dealings_for_customer(customer_name)
+      if !receipt_array.empty?
+        puts "\nPlease select the index of the receipt"
+        puts "Enter 'm' to go to the main menu or 'x' to exit the program"
+        receipt_index_str = gets.chomp.downcase
+        if receipt_index_str != 'x' && receipt_index_str != 'm'
+          receipt_index = receipt_index_str.to_i
+          if receipt_index > 0 && receipt_index <= receipt_array.length
+            the_receipt = receipt_array[receipt_index-1]
+            puts "\n#{customer_name}, the receipt from your #{the_receipt.type_deal} on #{the_receipt.date}\n"
+            total = show_items(the_receipt)
+            puts "\n The total of the #{the_receipt.type_deal} was $#{total}\n"
+          else
+            puts "\nInvalid index #{receipt_index} (#{receipt_index_str}, #{receipt_array.length}), try again"
+          end
+        elsif receipt_index_str == 'x'
+          exit_program
+        elsif receipt_index_str == 'm'
+        else
+          puts "Internal error receipt_index_str == #{receipt_index_str}"
+          exit_program
+        end
+      else
+        puts "\nSorry, #{customer_name}, you have no receipts in the system"
+        choice = 'm'
       end
+    elsif customer_name == 'X'
+      exit_program
+    elsif customer_name == "M"
+    else
+      puts "Intenal error customer_name == #{customer_name}"
     end
   end
 end
 
-def list_receipts
+def list_dealings_for_customer(customer_name)
+  the_customer = find_customer(customer_name)
+  receipt_array = the_customer.dealings.order('date DESC')
+  receipt_array.each_with_index do |receipt, index|
+    puts "#{index+1}. #{receipt.date} $#{receipt.total}\n"
+  end
+  receipt_array
 end
 
-def show
+def find_customer(customer_name)
+  found_customer = nil
+  found_customer = Customer.find_by(name: customer_name)
+  if found_customer == nil
+    found_customer = Customer.create({:name=>customer_name})
+  end
+  found_customer
+end
+
+def show_items(the_receipt)
+  total = 0
+  the_receipt.items.each_with_index do |item, index|
+    line_total = item.quantity * item.product.price
+    total += line_total
+    puts "#{index+1}. #{item.quantity} #{item.product.unit} of #{item.product.name} @ $#{item.product.price.round(2)} " +
+         "= $#{line_total}\n"
+  end
+  total
 end
 
 def manager_menu
@@ -126,14 +180,16 @@ end
 
 def create_product
   choice = nil
-  unit_array - ["ea","lb","oz","yd","in","q","ts","kg","g","m","cm","l","ml"]
+  unit_array = ["ea","lb","oz","yd","in","q","ts","kg","g","m","cm","l","ml"]
   while choice != "x" && choice != "m"
     puts "\nEnter the name of the product"
     name = nil
     name = gets.chomp.upcase
     if name != nil
-      puts "Enter the price of the product"
-      price = gets.chomp.to_f.round(2)
+      puts "Enter the price of the product in dollars"
+      price_char = gets.chomp
+      price_char.slice!(/\D/)
+      price = price_char.to_f.round(2)
       if price > 0
         puts "Select the unit by which the product will be sold"
         puts "[ ea ] = each (default)"
@@ -157,7 +213,7 @@ def create_product
         unit = gets.chomp.downcase
         if unit_array.include?(unit)
           new_product = Product.create({:name=>name, :price=>price, :unit=>unit})
-          puts "Product #{new_product.name} with price : #{new_product.price}/#{new_product.unit} was saved to the database"
+          puts "Product #{new_product.name} with price : #{new_product.price} per #{new_product.unit} was saved to the database"
         else
           puts "Unit entered not found, try again"
         end
@@ -211,7 +267,7 @@ def cashier_menu
     when 'r'
       process_return
     when 'x'
-      exit program
+      exit_program
     when 'm'
     else
       puts "Please choose a valid option"
@@ -222,9 +278,9 @@ end
 def cashier_log_in
   puts "Please log in to the system by entering your cashier ID"
   login = gets.chomp.downcase
-  cashier_array = Cashier.find_by(login: login)
-  if !cashier_array.empty?
-    @current_cashier = login
+  cashier = Cashier.find_by(login: login)
+  if cashier != nil
+    @current_cashier = cashier
     return true
   else
     return false
@@ -233,16 +289,12 @@ end
 
 def create_purchase
   type_deal='purchase'
-  puts "Please enter the customer name"
+  puts "\nPlease enter the customer name"
   name = gets.chomp.upcase
-  found_customer = nil
-  found_customer = Customer.find_by(name: name)
-  if !found_customer
-    found_customer = Customer.create({:name=>name})
-  end
-  puts "Please enter the purchase date ('MM/DD/YYYY format')"
+  the_customer = find_customer(name)
+  puts "Please enter the purchase date ('YYYY-MM-DD' format)"
   date = gets.chomp
-  if date =~ /\d\d\/\d\d\/\d\d\d\d/
+  if date =~ /\d\d\d\d-\d\d-\d\d/
     puts "Please enter the first product"
     product = gets.chomp.upcase
     new_product = nil
@@ -252,8 +304,8 @@ def create_purchase
       puts "Please enter the quantity"
       quantity= gets.chomp.to_i
       if quantity > 0
-        new_dealing = Dealing.create({:date=>date, :type_deal=>type_deal,
-                                :customer_id=>found_customer.id, :cashier_id=>@current_cashier.id})
+        new_dealing = Dealing.create({:date=>date, :type_deal=>type_deal, :total=>0,
+                                :customer_id=>the_customer.id, :cashier_id=>@current_cashier.id})
         new_item = Item.create({:quantity=>quantity, :dealing_id=>new_dealing.id,
                                 :product_id=>new_product.id})
         puts "Enter 'y' or 'yes' to continue adding items"
@@ -263,13 +315,15 @@ def create_purchase
         case choice
         when 'y'
           add_items(new_dealing.id,"y")
-          show_receipt(new_dealing.id)
+          the_total = show_receipt(new_dealing, the_customer)
+          new_dealing.update(:total=>the_total)
         when 'm'
           main_menu
         when 'x'
           exit_program
         else
-          show_receipt(new_dealing.id)
+          the_total = show_receipt(new_dealing, the_customer)
+          new_dealing.update(:total=>the_total)
         end
       else
         puts "Product quantity must be greater than zero"
@@ -278,7 +332,7 @@ def create_purchase
       puts "Product not found in the database"
     end
   else
-    puts "Date must be in 'MM/DD/YYYY' format; please try again"
+    puts "Date must be in 'YYYY-MM-DD' format; please try again"
   end
 end
 
@@ -314,10 +368,11 @@ def add_items(dealing_id, choice)
   end
 end
 
-def show_price
-end
-
-def show_total
+def show_receipt(the_receipt, the_customer)
+  puts "\nThe receipt for #{the_customer.name}'S #{the_receipt.type_deal} on #{the_receipt.date}\n"
+  total = show_items(the_receipt)
+  puts "\nTotal of #{the_receipt.type_deal} was $#{receipt.total}\n"
+  total
 end
 
 def process_return
