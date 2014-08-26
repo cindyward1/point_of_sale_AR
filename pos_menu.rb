@@ -95,7 +95,7 @@ def list_dealings_for_customer(customer_name)
   the_customer = find_customer(customer_name)
   receipt_array = the_customer.dealings.order('date DESC')
   receipt_array.each_with_index do |receipt, index|
-    puts "#{index+1}. #{receipt.date} $#{receipt.total}\n"
+    puts "#{index+1}. #{receipt.date} #{receipt.type_deal} for $#{receipt.total}\n"
   end
   receipt_array
 end
@@ -255,21 +255,11 @@ def view_most_products(type)
       product_dealings_array = product.dealings.where("type_deal = '#{type}'")
       if product_dealings_array != []
         product_dealings_array.each do |dealing|
-          puts "\nProduct = #{product.name}"
-          p dealing
-          puts "\n"
-          products_sold = dealing.items.sum("quantity")
-          puts "\nItems:"
-          p dealing.items
-          puts "\n"
+          products_sold = dealing.items.where(:product_id=>product.id).sum("quantity")
           index_product = product_array.find_index { |hash_item| hash_item[:product_name] == product.name }
           if index_product != nil
-            puts "!before replace #{index_product}"
-            puts product_array[index_product]
             new_total_sold = product_array[index_product][:total_sold] + products_sold
             product_array[index_product].replace({:product_name=>product.name, :total_sold=>new_total_sold})
-            puts "!after replace #{index_product}"
-            puts product_array[index_product]
           else
             product_array << {:product_name=>product.name, :total_sold=>products_sold}
           end

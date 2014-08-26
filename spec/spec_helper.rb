@@ -4,7 +4,7 @@ require 'rspec'
 require 'cashier'
 require 'product'
 require 'customer'
-require 'transaction'
+require 'dealing'
 require 'item'
 
 database_configurations = YAML::load(File.open('./db/config.yml'))
@@ -22,7 +22,7 @@ RSpec.configure do |config|
     Customer.all.each { |customer| customer.destroy }
   end
   config.after(:each) do
-    Transaction.all.each { |transaction| transaction.destroy }
+    Dealing.all.each { |transaction| transaction.destroy }
   end
   config.after(:each) do
     Item.all.each { |item| item.destroy }
