@@ -283,6 +283,30 @@ def view_total_sales
 end
 
 def view_customer_count
+  puts "\nVIEW CASHIER ACTIVITY for a date range"
+  puts "Enter the first date of the range ('YYYY-MM-DD' format)"
+  first_date = gets.chomp
+  if first_date =~ /\d\d\d\d-\d\d-\d\d/
+    puts "Enter the last date of the range ('YYYY-MM-DD' format)"
+    last_date = gets.chomp
+    if last_date =~ /\d\d\d\d-\d\d-\d\d/
+      if !Cashier.all.empty?
+        Cashier.all.each do |cashier|
+          cashier_dealing_count = Dealing.where("date >= TO_DATE('#{first_date}', 'YYYY-MM-DD') " +
+                                                "AND date <= TO_DATE('#{last_date}', 'YYYY-MM-DD') " +
+                                                "AND cashier_id = #{cashier.id}").count
+          puts "\nThe total dealings for cashier #{cashier.name} between #{first_date} and #{last_date} " +
+               "were #{cashier_dealing_count}"
+        end
+      else
+        puts "\nThere are no cashiers in the database"
+      end
+    else
+      puts "\nInvalid last date entered, try again"
+    end
+  else
+    puts "\nInvalid first date entered, try again"
+  end
 end
 
 def cashier_menu
