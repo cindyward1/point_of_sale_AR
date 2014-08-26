@@ -53,6 +53,7 @@ def customer_menu
     puts "Enter 'm' to go to the main menu or 'x' to exit the program"
     customer_name = gets.chomp.upcase
     if customer_name != "X" && customer_name != "M"
+      puts "\n#{customer_name}, your C & P Store receipts\n"
       receipt_array = list_dealings_for_customer(customer_name)
       if !receipt_array.empty?
         puts "\nPlease select the index of the receipt"
@@ -64,13 +65,14 @@ def customer_menu
             the_receipt = receipt_array[receipt_index-1]
             puts "\n#{customer_name}, the receipt from your #{the_receipt.type_deal} on #{the_receipt.date}\n"
             total = show_items(the_receipt)
-            puts "\n The total of the #{the_receipt.type_deal} was $#{total}\n"
+            puts "\nThe total of the #{the_receipt.type_deal} was $#{the_receipt.total}\n"
           else
             puts "\nInvalid index #{receipt_index} (#{receipt_index_str}, #{receipt_array.length}), try again"
           end
         elsif receipt_index_str == 'x'
           exit_program
         elsif receipt_index_str == 'm'
+          choice = 'm'
         else
           puts "Internal error receipt_index_str == #{receipt_index_str}"
           exit_program
@@ -82,6 +84,7 @@ def customer_menu
     elsif customer_name == 'X'
       exit_program
     elsif customer_name == "M"
+      choice = 'm'
     else
       puts "Intenal error customer_name == #{customer_name}"
     end
@@ -109,9 +112,14 @@ end
 def show_items(the_receipt)
   total = 0
   the_receipt.items.each_with_index do |item, index|
-    line_total = item.quantity * item.product.price
+    if the_receipt.type_deal == "return"
+      item_quantity = -item.quantity
+    else
+      item_quantity = item.quantity
+    end
+    line_total = item_quantity * item.product.price
     total += line_total
-    puts "#{index+1}. #{item.quantity} #{item.product.unit} of #{item.product.name} @ $#{item.product.price.round(2)} " +
+    puts "#{index+1}. #{item_quantity} #{item.product.unit} of #{item.product.name} @ $#{item.product.price.round(2)} " +
          "= $#{line_total}\n"
   end
   total
@@ -242,6 +250,36 @@ def view_most_returned_products
 end
 
 def view_total_sales
+  puts "\nVIEW TOTAL SALES for a date range"
+  puts "Enter the first date of the range ('YYYY-MM-DD' format)"
+  first_date = gets.chomp
+  if first_date =~ /\d\d\d\d-\d\d-\d\d/
+    puts "Enter the last date of the range ('YYYY-MM-DD' format)"
+    last_date = gets.chomp
+    if last_date =~ /\d\d\d\d-\d\d-\d\d/
+      the_dealings_array = Dealing.where("date >= TO_DATE('#{first_date}', 'YYYY-MM-DD') " +
+                                         "AND date <= TO_DATE('#{last_date}', 'YYYY-MM-DD')")
+      total_sales = 0
+      total_returns = 0
+      if !the_dealings_array.empty?
+        the_dealings_array.each do |dealing|
+          if dealing.type_deal == "purchase"
+            total_sales += dealing.total
+          else
+            total_returns += dealing.total
+          end
+        end
+        puts "\nThe net sales between #{first_date} and #{last_date} were $#{total_sales}"
+        puts "\nThe total returns between #{first_date} and #{last_date} were $#{total_returns}"
+      else
+        puts "\nThere were no sales or returns between #{first_date} and #{last_date}"
+      end
+    else
+      puts "\nInvalid last date entered, try again"
+    end
+  else
+    puts "\nInvalid first date entered, try again"
+  end
 end
 
 def view_customer_count
@@ -372,7 +410,7 @@ end
 def show_receipt(the_receipt, the_customer)
   puts "\nThe receipt for #{the_customer.name}'S #{the_receipt.type_deal} on #{the_receipt.date}\n"
   total = show_items(the_receipt)
-  puts "\nTotal of #{the_receipt.type_deal} was $#{the_receipt.total}\n"
+  puts "\nTotal of #{the_receipt.type_deal} was $#{total}\n"
   total
 end
 
@@ -399,57 +437,61 @@ def process_return
           index += 1
         end
       end
-      puts "\nPlease select the index of the item being returned"
-      puts "Enter 'm' to go to the main menu or 'x' to exit the program"
-      product_index_str = gets.chomp.downcase
-      if product_index_str != 'x' && product_index_str != 'm'
-        product_index = product_index_str.to_i
-        if product_index > 0 && product_index <= product_array.length
-          today = Date.today
-          today_char = today.year.to_s + "-" + today.month.to_s + "-" + today.day.to_s
-          the_return = product_array[product_index-1]
-          the_item = Item.find_by(:id=>the_return[:item_id])
-          the_dealing = Dealing.find_by(:id=>the_return[:receipt_id])
-          the_product = Product.find_by(:id=>the_return[:product_id])
-          puts "\nPlease enter the quantity of the product to return"
-          puts "Enter 'm' to go to the main menu or 'x' to exit the program"
-          quantity_str = gets.chomp.downcase
-          if quantity_str != 'x' && quantity_str != 'm'
-            quantity_return = quantity_str.to_i
-            if quantity_return > 0 && quantity_return <= the_item.quantity
-              new_quantity = the_item.quantity - quantity_return
-              return_total = -quantity_return * the_product.price
-              new_total = the_dealing.total + return_total
-              new_dealing = Dealing.create({:date=>today_char, :type_deal=>type_deal, :total=>return_total,
-                                :customer_id=>the_customer.id, :cashier_id=>@current_cashier.id})
-              new_item = Item.create({:quantity=>quantity_return, :dealing_id=>new_dealing.id,
-                                :product_id=>the_product.id})
-              if new_quantity == 0
-                the_item.destroy
+      if !product_array.empty?
+        puts "\nPlease select the index of the item being returned"
+        puts "Enter 'm' to go to the main menu or 'x' to exit the program"
+        product_index_str = gets.chomp.downcase
+        if product_index_str != 'x' && product_index_str != 'm'
+          product_index = product_index_str.to_i
+          if product_index > 0 && product_index <= product_array.length
+            today = Date.today
+            today_char = today.year.to_s + "-" + today.month.to_s + "-" + today.day.to_s
+            the_return = product_array[product_index-1]
+            the_item = Item.find_by(:id=>the_return[:item_id])
+            the_dealing = Dealing.find_by(:id=>the_return[:receipt_id])
+            the_product = Product.find_by(:id=>the_return[:product_id])
+            puts "\nPlease enter the quantity of the product to return"
+            puts "Enter 'm' to go to the main menu or 'x' to exit the program"
+            quantity_str = gets.chomp.downcase
+            if quantity_str != 'x' && quantity_str != 'm'
+              quantity_return = quantity_str.to_i
+              if quantity_return > 0 && quantity_return <= the_item.quantity
+                new_quantity = the_item.quantity - quantity_return
+                return_total = -quantity_return * the_product.price
+                new_total = the_dealing.total + return_total
+                new_dealing = Dealing.create({:date=>today_char, :type_deal=>type_deal, :total=>return_total,
+                                  :customer_id=>the_customer.id, :cashier_id=>@current_cashier.id})
+                new_item = Item.create({:quantity=>quantity_return, :dealing_id=>new_dealing.id,
+                                  :product_id=>the_product.id})
+                if new_quantity == 0
+                  the_item.destroy
+                else
+                  the_item.update(:quantity=>new_quantity)
+                end
+                the_dealing.update(:total=>new_total)
+                puts "\n#{the_customer.name} has returned #{quantity_return} #{the_product.unit} of #{the_product.name}\n"
               else
-                the_item.update(:quantity=>new_quantity)
+                puts "\nInvalid quantity entered, try again"
               end
-              the_dealing.update(:total=>new_total)
-              puts "\n#{the_customer.name} has returned #{quantity_return} #{the_product.unit} of #{the_product.name}\n"
+            elsif quantity_str == 'x'
+              exit_program
+            elsif quantity_str == 'm'
             else
-              puts "\nInvalid quantity entered, try again"
+              puts "Internal error quantity_str == #{quantity_str}"
+              exit_program
             end
-          elsif quantity_str == 'x'
-            exit_program
-          elsif quantity_str == 'm'
           else
-            puts "Internal error quantity_str == #{quantity_str}"
-            exit_program
+            puts "\nInvalid index entered, try again"
           end
+        elsif product_index_str == 'x'
+          exit_program
+        elsif product_index_str == 'm'
         else
-          puts "\nInvalid index #{receipt_index} (#{receipt_index_str}, #{receipt_array.length}), try again"
+          puts "Internal error receipt_index_str == #{receipt_index_str}"
+          exit_program
         end
-      elsif product_index_str == 'x'
-        exit_program
-      elsif product_index_str == 'm'
       else
-        puts "Internal error receipt_index_str == #{receipt_index_str}"
-        exit_program
+        puts "\nThere are no items to return for #{customer_name}"
       end
     else
       puts "\nThere are no receipts available for #{customer_name}"
