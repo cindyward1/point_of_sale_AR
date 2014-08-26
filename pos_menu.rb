@@ -145,9 +145,9 @@ def manager_menu
     when 'p'
       create_product
     when 'f'
-      view_favorite_products
+      view_most_products("purchase")
     when 'r'
-      view_most_returned_products
+      view_most_products("return")
     when 's'
       view_total_sales
     when 'n'
@@ -243,10 +243,54 @@ def create_product
   end
 end
 
-def view_favorite_products
-end
-
-def view_most_returned_products
+def view_most_products(type)
+  if type == "purchase"
+    puts "\nVIEW FAVORITE PRODUCTS\n\n"
+  else
+    puts "\nVIEW MOST RETURNED PRODUCTS\n\n"
+  end
+  product_array = []
+  if !Product.all.empty?
+    Product.all.each do |product|
+      product_dealings_array = product.dealings.where("type_deal = '#{type}'")
+      if product_dealings_array != []
+        product_dealings_array.each do |dealing|
+          puts "\nProduct = #{product.name}"
+          p dealing
+          puts "\n"
+          products_sold = dealing.items.sum("quantity")
+          puts "\nItems:"
+          p dealing.items
+          puts "\n"
+          index_product = product_array.find_index { |hash_item| hash_item[:product_name] == product.name }
+          if index_product != nil
+            puts "!before replace #{index_product}"
+            puts product_array[index_product]
+            new_total_sold = product_array[index_product][:total_sold] + products_sold
+            product_array[index_product].replace({:product_name=>product.name, :total_sold=>new_total_sold})
+            puts "!after replace #{index_product}"
+            puts product_array[index_product]
+          else
+            product_array << {:product_name=>product.name, :total_sold=>products_sold}
+          end
+        end
+      else
+        product_array << {:product_name=>product.name, :total_sold=>0}
+      end
+    end
+    product_array.sort_by! { |hash_item| [ -hash_item[:total_sold], hash_item[:product_name] ]}
+    product_array.each_with_index do |product|
+      if type == "purchase"
+        verb = "sold"
+      else
+        verb = "returned"
+      end
+      puts "#{product[:product_name]}: Total #{verb} #{product[:total_sold]}"
+    end
+    puts "\n"
+  else
+    puts "\nThere are no products in the database"
+  end
 end
 
 def view_total_sales
